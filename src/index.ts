@@ -37,6 +37,7 @@ import { Post } from "./entities/Post";
 
 const main = async () => {
   // sendEmail("bob@bob.com", "hello there");
+  //
 
   await createConnection({
     type: "postgres",
@@ -44,9 +45,12 @@ const main = async () => {
     username: DB_USER,
     password: DB_PASSWORD,
     logging: true,
+    migrations: [path.join(__dirname, "migrations", "*")],
     synchronize: !IS_PROD,
     entities: [User, Post],
   });
+
+  // await conn.runMigrations();
 
   const app = express();
 

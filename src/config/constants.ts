@@ -30,6 +30,10 @@ export const DEFAULT_USERNAME_FIELDNAME = "username";
 export const DEFAULT_USER_PASSWORD_FIELDNAME = "password";
 export const DEFAULT_USER_EMAIL_ADDRESS_FIELDNAME = "email";
 
+export const MAX_POSTS_QUERY_LIMIT = 50;
+export const MIN_POSTS_QUERY_LIMIT = 1;
+export const DEFAULT_POSTS_QUERY_LIMIT = 5;
+
 export const {
   SESSION_SECRET,
   PORT,

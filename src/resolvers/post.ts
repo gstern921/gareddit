@@ -8,9 +8,16 @@ import {
   Field,
   Ctx,
   UseMiddleware,
+  Int,
 } from "type-graphql";
 import { Post } from "../entities/Post";
 import { MyContext } from "../types";
+import { getConnection } from "typeorm";
+import {
+  MAX_POSTS_QUERY_LIMIT,
+  DEFAULT_POSTS_QUERY_LIMIT,
+  MIN_POSTS_QUERY_LIMIT,
+} from "../config/constants";
 
 @InputType()
 class PostInput {
@@ -23,8 +30,27 @@ class PostInput {
 @Resolver()
 export class PostResolver {
   @Query(() => [Post])
-  posts(): Promise<Post[]> {
-    return Post.find();
+  posts(
+    @Arg("limit", () => Int, { defaultValue: DEFAULT_POSTS_QUERY_LIMIT })
+    limit: number,
+    @Arg("cursor", () => String, { defaultValue: Date.now().toString() })
+    cursor: string | null
+  ): Promise<Post[]> {
+    let actualLimit = Math.min(limit, MAX_POSTS_QUERY_LIMIT);
+    actualLimit = Math.max(actualLimit, MIN_POSTS_QUERY_LIMIT);
+    let q = getConnection()
+      .getRepository(Post)
+      .createQueryBuilder("p")
+      .take(actualLimit)
+      .orderBy('"createdAt"', "DESC");
+
+    if (cursor) {
+      q = q.where('"createdAt" < :cursor', {
+        cursor: new Date(parseInt(cursor)),
+      });
+    }
+
+    return q.getMany();
   }
 
   @Query(() => Post, { nullable: true })
