@@ -51,47 +51,63 @@ export class PostResolver {
     @Arg("limit", () => Int, { defaultValue: DEFAULT_POSTS_QUERY_LIMIT })
     limit: number,
     @Arg("cursor", () => String, { nullable: true })
-    cursor: string | null
+    cursor: string | null,
+    @Ctx() { req }: MyContext
   ): Promise<PaginatedPosts> {
     let actualLimit = Math.min(limit, MAX_POSTS_QUERY_LIMIT);
     actualLimit = Math.max(actualLimit, MIN_POSTS_QUERY_LIMIT);
     const actualLimitPlusOne = actualLimit + 1;
+    const { userId } = req.session;
 
-    // const replacements: any[] = [actualLimitPlusOne];
+    const replacements: any[] = [actualLimitPlusOne];
 
-    // if (cursor) {
-    //   replacements.push(new Date(cursor));
-    // }
-
-    //   let query = getConnection().query(
-    //     `
-    //   SELECT p.* FROM post p
-    //   json_build_object(
-    //     'id', u.id
-    //     'username', u.username,
-    //     'email', u.email,
-    //     ) creator
-    //   INNER JOIN public.user u ON p."creatorId" = u.id
-    //   ${cursor ? `WHERE p."createdAt" < $2` : ``}
-    //   ORDER BY p."createdAt" DESC LIMIT $1
-    // `,
-    //     replacements
-    //   );
-
-    let q = getConnection()
-      .getRepository(Post)
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.creator", "user")
-      .orderBy('post."createdAt"', "DESC")
-      .limit(actualLimitPlusOne);
-
-    if (cursor) {
-      q = q.where('post."createdAt" < :cursor', {
-        cursor: new Date(cursor),
-      });
+    if (userId) {
+      replacements.push(userId);
     }
 
-    const posts = await q.getMany();
+    let cursorReplacementIndex = userId ? 3 : 2;
+    if (cursor) {
+      replacements.push(new Date(cursor));
+      cursorReplacementIndex = replacements.length;
+    }
+
+    let query = getConnection().query(
+      `
+      SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'email', u.email,
+         'createdAt', u."createdAt",
+         'updatedAt', u."updatedAt"
+        ) creator,
+        ${
+          userId
+            ? `(select value from updoot where "userId" = $2 and "postId" = p.id) as "voteStatus"`
+            : `null as "voteStatus"`
+        }
+       FROM post p
+       INNER JOIN public.user u ON p."creatorId" = u.id
+      ${cursor ? `WHERE p."createdAt" < $${cursorReplacementIndex}` : ``}
+      ORDER BY p."createdAt" DESC LIMIT $1
+    `,
+      replacements
+    );
+
+    // let q = getConnection()
+    //   .getRepository(Post)
+    //   .createQueryBuilder("post")
+    //   .leftJoinAndSelect("post.creator", "user")
+    //   .orderBy('post."createdAt"', "DESC")
+    //   .limit(actualLimitPlusOne);
+
+    // if (cursor) {
+    //   q = q.where('post."createdAt" < :cursor', {
+    //     cursor: new Date(cursor),
+    //   });
+    // }
+
+    const posts = await query;
     // console.log(posts.length);
 
     return {
@@ -101,8 +117,44 @@ export class PostResolver {
   }
 
   @Query(() => Post, { nullable: true })
-  post(@Arg("id") id: number): Promise<Post | undefined> {
-    return Post.findOne(id);
+  post(@Arg("id", () => Int) id: number): Promise<Post | undefined> {
+    return Post.findOne(id, { relations: ["creator"] });
+
+    // let query = await getConnection().query(
+    //   `
+    //   SELECT p.*,
+    //   json_build_object(
+    //     'id', u.id,
+    //     'username', u.username,
+    //     'email', u.email,
+    //      'createdAt', u."createdAt",
+    //      'updatedAt', u."updatedAt"
+    //     ) creator
+    //    FROM post p
+    //    INNER JOIN public.user u ON p."creatorId" = u.id
+    //    WHERE p.id = $1
+    //    LIMIT 1
+    // `,
+    //   [id]
+    // );
+
+    // let q = getConnection()
+    //   .getRepository(Post)
+    //   .createQueryBuilder("post")
+    //   .leftJoinAndSelect("post.creator", "user")
+    //   .orderBy('post."createdAt"', "DESC")
+    //   .limit(actualLimitPlusOne);
+
+    // if (cursor) {
+    //   q = q.where('post."createdAt" < :cursor', {
+    //     cursor: new Date(cursor),
+    //   });
+    // }
+
+    // const post = await query;
+    // console.log(posts.length);
+
+    // return post;
   }
   @Mutation(() => Post)
   @UseMiddleware(isAuth)
@@ -128,24 +180,74 @@ export class PostResolver {
     const isUpdoot = value > 0;
     const voteValue = isUpdoot ? 1 : -1;
     const { userId } = req.session;
-    try {
-      await getConnection().transaction(async (transactionalEntityManager) => {
-        await transactionalEntityManager.increment(
-          Post,
-          { id: postId },
-          "points",
-          voteValue
+
+    const existingVote = await Updoot.findOne({ postId, userId });
+    if (!existingVote) {
+      try {
+        await getConnection().transaction(
+          async (transactionalEntityManager) => {
+            await transactionalEntityManager.increment(
+              Post,
+              { id: postId },
+              "points",
+              voteValue
+            );
+            await transactionalEntityManager.insert(Updoot, {
+              userId,
+              postId,
+              value: voteValue,
+            });
+          }
         );
-        await transactionalEntityManager.insert(Updoot, {
-          userId,
-          postId,
-          value: voteValue,
-        });
-      });
-    } catch (e) {
+      } catch (e) {
+        return false;
+      }
+      return true;
+    } else if (existingVote.value !== voteValue) {
+      console.log(existingVote, voteValue);
+      try {
+        await getConnection().transaction(
+          async (transactionalEntityManager) => {
+            await transactionalEntityManager.increment(
+              Post,
+              { id: postId },
+              "points",
+              voteValue * 2
+            );
+
+            await transactionalEntityManager
+              .createQueryBuilder()
+              .update(Updoot)
+              .set({ value: voteValue })
+              .where({ postId, userId })
+              .execute();
+          }
+        );
+      } catch (_) {
+        console.log(_);
+        return false;
+      }
+      return true;
+    } else {
+      try {
+        await getConnection().transaction(
+          async (transactionalEntityManager) => {
+            await transactionalEntityManager.increment(
+              Post,
+              { id: postId },
+              "points",
+              -voteValue
+            );
+            await transactionalEntityManager.delete(Updoot, { postId, userId });
+          }
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
       return false;
     }
-    return true;
+    return false;
   }
 
   @Mutation(() => Post, { nullable: true })
@@ -163,9 +265,16 @@ export class PostResolver {
     return post;
   }
   @Mutation(() => Boolean)
-  async deletePost(@Arg("id") id: number): Promise<boolean> {
+  @UseMiddleware(isAuth)
+  async deletePost(
+    @Arg("id") id: number,
+    @Ctx() { req }: MyContext
+  ): Promise<boolean> {
     try {
-      const removedPost = await Post.delete({ id });
+      const removedPost = await Post.delete({
+        id,
+        creatorId: req.session.userId,
+      });
       return !!removedPost;
     } catch (_) {
       return false;

@@ -32,10 +32,10 @@ import {
   DB_USER,
   DB_PASSWORD,
 } from "./config/constants";
-import { User } from "./entities/User";
-import { Post } from "./entities/Post";
-import { Updoot } from "./entities/Updoot";
-
+// import { User } from "./entities/User";
+// import { Post } from "./entities/Post";
+// import { Updoot } from "./entities/Updoot";
+//
 const main = async () => {
   // sendEmail("bob@bob.com", "hello there");
 
@@ -47,11 +47,11 @@ const main = async () => {
     logging: true,
     migrations: [path.join(__dirname, "migrations", "*")],
     synchronize: !IS_PROD,
-    entities: [User, Post, Updoot],
+    entities: [__dirname + "/entities/*.js"],
   });
   conn ? null : null;
-  await conn.runMigrations();
-
+  // await conn.runMigrations();
+  //
   const app = express();
 
   app.use(cors({ origin: CLIENT_URL, credentials: true }));

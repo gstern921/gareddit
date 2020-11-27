@@ -1,4 +1,4 @@
-import { Field, ObjectType } from "type-graphql";
+import { Field, Int, ObjectType } from "type-graphql";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -15,7 +15,7 @@ import { User } from "./User";
 @ObjectType()
 @Entity()
 export class Post extends BaseEntity {
-  @Field()
+  @Field(() => Int)
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -34,6 +34,9 @@ export class Post extends BaseEntity {
   @Field()
   @Column({ type: "integer", default: 0 })
   points!: number;
+
+  @Field(() => Int, { nullable: true })
+  voteStatus: number | null;
 
   @Field(() => User)
   @ManyToOne(() => User, (user) => user.posts)
