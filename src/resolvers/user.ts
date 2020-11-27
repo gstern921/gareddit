@@ -2,10 +2,12 @@ import {
   Arg,
   Ctx,
   Field,
+  FieldResolver,
   Mutation,
   ObjectType,
   Query,
   Resolver,
+  Root,
 } from "type-graphql";
 import { getConnection } from "typeorm";
 import argon2 from "argon2";
@@ -43,8 +45,18 @@ export class UserResponse {
   user?: User;
 }
 
-@Resolver()
+@Resolver(User)
 export class UserResolver {
+  @FieldResolver(() => String)
+  email(@Root() user: User, @Ctx() { req }: MyContext) {
+    if (req.session.userId === user.id) {
+      // this is the current user and it is ok to show them their own email
+      return user.email;
+    }
+    // The current user wants to see someone else's email
+    return "";
+  }
+
   @Query(() => User, { nullable: true })
   user(@Arg("id") id: number): Promise<User | undefined> {
     return User.findOne(id);

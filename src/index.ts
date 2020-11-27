@@ -34,12 +34,12 @@ import {
 } from "./config/constants";
 import { User } from "./entities/User";
 import { Post } from "./entities/Post";
+import { Updoot } from "./entities/Updoot";
 
 const main = async () => {
   // sendEmail("bob@bob.com", "hello there");
-  //
 
-  await createConnection({
+  const conn = await createConnection({
     type: "postgres",
     database: DB_NAME,
     username: DB_USER,
@@ -47,10 +47,10 @@ const main = async () => {
     logging: true,
     migrations: [path.join(__dirname, "migrations", "*")],
     synchronize: !IS_PROD,
-    entities: [User, Post],
+    entities: [User, Post, Updoot],
   });
-
-  // await conn.runMigrations();
+  conn ? null : null;
+  await conn.runMigrations();
 
   const app = express();
 
