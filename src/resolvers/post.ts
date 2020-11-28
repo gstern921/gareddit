@@ -17,6 +17,7 @@ import { Updoot } from "../entities/Updoot";
 import { MyContext } from "../types";
 import { getConnection } from "typeorm";
 import { ObjectType } from "type-graphql";
+import { User } from "../entities/User";
 import {
   MAX_POSTS_QUERY_LIMIT,
   DEFAULT_POSTS_QUERY_LIMIT,
@@ -44,6 +45,11 @@ export class PostResolver {
   @FieldResolver(() => String)
   textSnippet(@Root() root: Post) {
     return root.text.substring(0, 50);
+  }
+
+  @FieldResolver(() => User)
+  creator(@Root() post: Post, @Ctx() { userLoader }: MyContext) {
+    return userLoader.load(post.creatorId);
   }
 
   @Query(() => PaginatedPosts)
@@ -258,9 +264,6 @@ export class PostResolver {
     @Arg("text") text: string,
     @Ctx() { req }: MyContext
   ): Promise<Post | undefined> {
-    const userId = req.session.userId;
-    const postId = id;
-
     const result = await getConnection()
       .createQueryBuilder()
       .update(Post)
