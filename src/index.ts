@@ -36,6 +36,7 @@ import {
 // import { Post } from "./entities/Post";
 // import { Updoot } from "./entities/Updoot";
 import { createUserLoader } from "./utils/createUserLoader";
+import { createUpdootLoader } from "./utils/createUpdootLoader";
 //
 const main = async () => {
   // sendEmail("bob@bob.com", "hello there");
@@ -97,6 +98,7 @@ const main = async () => {
     res,
     redis,
     userLoader: createUserLoader(),
+    updootLoader: createUpdootLoader(),
   });
 
   const apolloServer = new ApolloServer({

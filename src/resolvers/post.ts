@@ -52,6 +52,22 @@ export class PostResolver {
     return userLoader.load(post.creatorId);
   }
 
+  @FieldResolver(() => User)
+  async voteStatus(
+    @Root() post: Post,
+    @Ctx() { updootLoader, req }: MyContext
+  ) {
+    if (!req.session.userId) {
+      return null;
+    }
+    const updoot = await updootLoader.load({
+      postId: post.id,
+      userId: req.session.userId,
+    });
+
+    return updoot ? updoot.value : null;
+  }
+
   @Query(() => PaginatedPosts)
   async posts(
     @Arg("limit", () => Int, { defaultValue: DEFAULT_POSTS_QUERY_LIMIT })
@@ -67,35 +83,16 @@ export class PostResolver {
 
     const replacements: any[] = [actualLimitPlusOne];
 
-    if (userId) {
-      replacements.push(userId);
-    }
-
-    let cursorReplacementIndex = userId ? 3 : 2;
     if (cursor) {
       replacements.push(new Date(cursor));
-      cursorReplacementIndex = replacements.length;
     }
 
     let query = getConnection().query(
       `
-      SELECT p.*,
-      json_build_object(
-        'id', u.id,
-        'username', u.username,
-        'email', u.email,
-         'createdAt', u."createdAt",
-         'updatedAt', u."updatedAt"
-        ) creator,
-        ${
-          userId
-            ? `(select value from updoot where "userId" = $2 and "postId" = p.id) as "voteStatus"`
-            : `null as "voteStatus"`
-        }
-       FROM post p
-       INNER JOIN public.user u ON p."creatorId" = u.id
-      ${cursor ? `WHERE p."createdAt" < $${cursorReplacementIndex}` : ``}
-      ORDER BY p."createdAt" DESC LIMIT $1
+      SELECT *
+      FROM post
+      ${cursor ? `WHERE post."createdAt" < $2` : ``}
+      ORDER BY post."createdAt" DESC LIMIT $1
     `,
       replacements
     );
@@ -124,43 +121,7 @@ export class PostResolver {
 
   @Query(() => Post, { nullable: true })
   post(@Arg("id", () => Int) id: number): Promise<Post | undefined> {
-    return Post.findOne(id, { relations: ["creator"] });
-
-    // let query = await getConnection().query(
-    //   `
-    //   SELECT p.*,
-    //   json_build_object(
-    //     'id', u.id,
-    //     'username', u.username,
-    //     'email', u.email,
-    //      'createdAt', u."createdAt",
-    //      'updatedAt', u."updatedAt"
-    //     ) creator
-    //    FROM post p
-    //    INNER JOIN public.user u ON p."creatorId" = u.id
-    //    WHERE p.id = $1
-    //    LIMIT 1
-    // `,
-    //   [id]
-    // );
-
-    // let q = getConnection()
-    //   .getRepository(Post)
-    //   .createQueryBuilder("post")
-    //   .leftJoinAndSelect("post.creator", "user")
-    //   .orderBy('post."createdAt"', "DESC")
-    //   .limit(actualLimitPlusOne);
-
-    // if (cursor) {
-    //   q = q.where('post."createdAt" < :cursor', {
-    //     cursor: new Date(cursor),
-    //   });
-    // }
-
-    // const post = await query;
-    // console.log(posts.length);
-
-    // return post;
+    return Post.findOne(id);
   }
   @Mutation(() => Post)
   @UseMiddleware(isAuth)
