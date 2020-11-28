@@ -73,13 +73,11 @@ export class PostResolver {
     @Arg("limit", () => Int, { defaultValue: DEFAULT_POSTS_QUERY_LIMIT })
     limit: number,
     @Arg("cursor", () => String, { nullable: true })
-    cursor: string | null,
-    @Ctx() { req }: MyContext
+    cursor: string | null
   ): Promise<PaginatedPosts> {
     let actualLimit = Math.min(limit, MAX_POSTS_QUERY_LIMIT);
     actualLimit = Math.max(actualLimit, MIN_POSTS_QUERY_LIMIT);
     const actualLimitPlusOne = actualLimit + 1;
-    const { userId } = req.session;
 
     const replacements: any[] = [actualLimitPlusOne];
 
