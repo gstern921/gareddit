@@ -1,5 +1,6 @@
 .DS_Store
 config.env
+dump.rdb
 # Logs
 logs
 *.log
