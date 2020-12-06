@@ -20,7 +20,7 @@ export const TIME_IN_MILLISECONDS: {
 export const NODE_ENV: string = process.env.NODE_ENV || "development";
 export const IS_PROD: boolean = NODE_ENV === "production";
 export const SESSION_COOKIE_NAME: string = "qid";
-export const CLIENT_URL: string = "http://localhost:3000";
+export const CLIENT_URL: string = "https://gareddit-client.herokuapp.com/";
 export const CHANGE_PASSWORD_PATH: string = "/change-password";
 export const REDIS_FORGET_PASSWORD_KEY_PREFIX: string = "forget-password:";
 export const FORGET_PASSWORD_TOKEN_EXPIRATION_TIME: number =
